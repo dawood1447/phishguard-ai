@@ -3,7 +3,6 @@ import numpy as np
 from scipy.sparse import hstack
 import re
 
-# Load the saved model and vectorizer
 try:
     classifier = joblib.load('model.pkl')
     vectorizer = joblib.load('vectorizer.pkl')
@@ -11,12 +10,12 @@ except FileNotFoundError:
     classifier = None
     vectorizer = None
 
-# --- HYBRID ENGINE: The Whitelist ---
-# Enterprise security tools always bypass ML for the most common safe sites.
+# ---> UPGRADE: Expanded Whitelist <---
 WHITELIST = set([
     "google.com", "youtube.com", "facebook.com", "wikipedia.org", 
     "amazon.com", "twitter.com", "instagram.com", "linkedin.com",
-    "github.com", "microsoft.com", "nhentai.net"
+    "github.com", "microsoft.com", "nhentai.net", "whatsapp.com",
+    "chatgpt.com", "openai.com", "netflix.com", "apple.com", "yahoo.com"
 ])
 
 def clean_url(url):
@@ -37,21 +36,30 @@ def extract_features(url):
     ]
 
 def predict_phishing(url):
-    """Hybrid check: Whitelist first, ML second."""
+    """Hybrid check: Smart Whitelist first, ML second."""
     if not classifier or not vectorizer:
         return "Error", 0.0
 
     cleaned_url = clean_url(url)
-
-    # 1. THE WHITELIST CHECK (Bypass AI)
-    # Extract the base domain (e.g., getting 'google.com' out of 'google.com/search')
     base_domain = cleaned_url.split('/')[0]
-    
-    if base_domain in WHITELIST or cleaned_url in WHITELIST:
-        return "legitimate", 100.00 # 100% confidence it's a globally trusted site
 
-    # 2. THE MACHINE LEARNING CHECK
-    # If the site isn't famous, let your trained AI analyze it
+    # ---> UPGRADE: Smart Subdomain Checker <---
+    is_whitelisted = False
+    
+    # 1. Check for an exact match
+    if base_domain in WHITELIST or cleaned_url in WHITELIST:
+        is_whitelisted = True
+    else:
+        # 2. Check if it's a subdomain of a trusted site (e.g., gemini.google.com)
+        for trusted_domain in WHITELIST:
+            if base_domain.endswith("." + trusted_domain):
+                is_whitelisted = True
+                break
+
+    if is_whitelisted:
+        return "legitimate", 100.00
+
+    # THE MACHINE LEARNING CHECK
     tfidf_features = vectorizer.transform([cleaned_url])
     custom_features = np.array([extract_features(cleaned_url)])
     
